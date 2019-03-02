@@ -196,7 +196,7 @@ class MasterFu:
         # Initialize the hive mind
         self.data = {}
         self.data[ "playing" ] = True
-        self.data[ "debug" ] = True
+        self.data[ "debug" ] = False
         self.data[ "ids" ] = {}
         self.data[ "master" ] = self.info
 
