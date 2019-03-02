@@ -54,7 +54,7 @@ class Kwami:
             distances.sort()
             targets.append( ( target, distances[ 0 ] ) )
         return targets
-        
+
     def PursueSafe( self ):
         allies = []
         for ally in self.data[ self.ownerName ][ "allies" ]:
@@ -62,19 +62,24 @@ class Kwami:
         if len( allies ) > 0:
             targets = self.GetDistances( allies )
             targets.sort( key = lambda tup: tup[ 1 ] )
-            self.AttackTargets( targets, distances = True )
+            return self.AttackTargets( targets, distances = True )
 
     def PursueGold( self ):
         if len( self.data[ "empty" ][ "gold" ] ) > 0:
             targets = self.GetDistances( self.data[ "empty" ][ "gold" ] )
             targets.sort( key = lambda tup: tup[ 1 ] )
-            self.AttackTargets( targets, distances = True )
+            return self.AttackTargets( targets, distances = True )
         if len( self.data[ "enemy" ][ "gold" ] ) > 0:
             targets = self.GetDistances( self.data[ "enemy" ][ "gold" ] )
             targets.sort( key = lambda tup: tup[ 1 ] )
-            self.AttackTargets( targets, distances = True )
+            return self.AttackTargets( targets, distances = True )
+
+    def PursueFast( self ):
+        self.data[ self.ownerName ][ "adjacent" ][ "all" ].sort( key = lambda cell: int( cell.takeTime * 10 ) )
+        return self.AttackTargets( self.data[ self.ownerName ][ "adjacent" ][ "all" ] )        
 
     def Start( self ):
+        self.game.Refresh()
         while self.data[ "playing" ]:
             if self.data[ "debug" ]:
                 self.GameLoop()
@@ -83,6 +88,72 @@ class Kwami:
                     self.GameLoop()
                 except:
                     pass           
+
+    def GetDamage( self, cell ):
+        if not cell:
+            return 0
+        if cell.owner in self.data[ "holders" ] or cell.owner == 0:
+            if cell.owner == self.data[ "leader" ] and self.game.uid != self.data[ "leader" ]:
+                return -1
+            else:
+                return 0
+        else:
+            if cell.cellType == "gold":
+                return 10
+            else:
+                return 1
+
+    def GetHDamage( self, cell ):
+        damage = 0
+        for xx in range( -4, 5 ):
+            if not xx == 0:
+                dmg = self.GetDamage( self.data[ "master" ].GetCell( cell.x + xx, cell.y ) )
+                if dmg == -1:
+                    return -1
+                damage += dmg
+        return damage
+
+    def GetVDamage( self, cell ):
+        damage = 0
+        for yy in range( -4, 5 ):
+            if not yy == 0:
+                dmg = self.GetDamage( self.data[ "master" ].GetCell( cell.x, cell.y + yy ) )
+                if dmg == -1:
+                    return -1
+                damage += dmg
+        return damage
+
+    def GetSDamage( self, cell ):
+        damage = 0
+        for xx in range( -1, 2 ):
+            for yy in range( -1, 2 ):
+                if not ( xx == 0 and yy == 0 ):
+                    dmg = self.GetDamage( self.data[ "master" ].GetCell( cell.x + xx, cell.y + yy ) )
+                    if dmg == -1:
+                        return -1
+                    damage += dmg
+        return damage
+
+    def EvaluateCataclysm( self ):
+        damages = []
+        for cell in self.data[ self.ownerName ][ "own" ][ "all" ]:
+            damages.append( ( cell, self.GetHDamage( cell ), "horizontal" ) )
+            damages.append( ( cell, self.GetVDamage( cell ), "vertical" ) )
+            damages.append( ( cell, self.GetSDamage( cell ), "square" ) )
+        damages.sort( key = lambda tup: tup[ 1 ], reverse = True )
+        return damages
+
+    def Cataclysm( self ):
+        damages = self.EvaluateCataclysm()
+        for target in damages:
+            if target[ 1 ] > 0:
+                self.game.Blast( target[ 0 ].x, target[ 0 ].y, target[ 2 ] )
+
+
+    def ProtectEiffel( self ):
+        targets = self.GetDistances( self.data[ self.ownerName ][ "own" ][ "safebases" ] )
+        targets.sort( key = lambda tup: tup[ 1 ] )
+        return self.AttackTargets( targets, distances = True )
 
     def BuildEiffel( self ):
         if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) > 0:
@@ -98,16 +169,24 @@ class Kwami:
                     targets.sort( key = lambda tup: tup[ 1 ], reverse = True )
                     for target in targets:
                         self.game.BuildBase( target[ 0 ].x, target[ 0 ].y )
-                
-
 
     def GameLoop( self ):
         if self.game.baseNum < 3 and self.game.gold >= 60:
             self.BuildEiffel()
-        if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) == 0 and choice( ( 0, 1 ) ) == 0:
-            return self.PursueSafe()
+        if self.game.endTime == 0 or self.data[ "time" ] < self.game.endTime - 5:
+            if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) == 0 and choice( ( 0, 1 ) ) == 0:
+                return self.PursueSafe()
+            else:
+                if( self.game.goldCellNum == 0 and self.game.baseNum < 2 ):
+                    return self.PursueGold()
+                else:
+                    if len( self.data[ self.ownerName ][ "own" ][ "safebases" ] ) > 0:
+                        self.ProtectEiffel()
+                    else:
+                        self.PursueFast()
         else:
-            self.PursueGold()
+            self.Cataclysm()
+
 
 class MasterFu:
     def __init__( self ):
@@ -119,6 +198,7 @@ class MasterFu:
         self.data[ "playing" ] = True
         self.data[ "debug" ] = True
         self.data[ "ids" ] = {}
+        self.data[ "master" ] = self.info
 
         # Initialize the Miraculous holders
         self.mari = Kwami( "Tikki", "Marinette", self.data )
@@ -133,6 +213,7 @@ class MasterFu:
 
         # Transform the Miraculous holders
         self.holders = set()
+        self.data[ "holders" ] = self.holders
         self.mari.Transform( "THS Mari" )
         self.adrien.Transform( "THS Adrien" )
         self.alya.Transform( "THS Alya" )
@@ -173,6 +254,8 @@ class MasterFu:
 
     def Refresh( self ):
         self.info.Refresh()
+        self.data[ "time" ] = self.info.currTime
+        self.data[ "leader" ] = self.mari.game.uid
         self.data[ "Marinette" ] = {}
         self.data[ "Marinette" ][ "allies" ] = [ "Adrien", "Alya" ]
         self.data[ "Adrien" ] = {}
@@ -192,6 +275,7 @@ class MasterFu:
             self.data[ t ][ "gold" ] = []
             self.data[ t ][ "energy" ] = []
             self.data[ t ][ "normal" ] = []
+        leader = []
         for user in self.info.users:
             if user.id in self.holders:
                 s = self.wayzz[ self.data[ "ids" ][ user.id ] ].game
@@ -203,6 +287,10 @@ class MasterFu:
                 s.baseNum = user.baseNum
                 s.goldCellNum = user.goldCellNum
                 s.energyCellNum = user.energyCellNum
+                leader.append( ( user.id, s.cellNum ) )
+        leader.sort( key = lambda tup: tup[ 1 ], reverse = True )
+        if len( leader ) > 0:
+            self.data[ "leader" ] = leader[ 0 ][ 0 ]
         for x in range( 30 ):
             for y in range( 30 ):
                 c = self.info.GetCell( x, y )
