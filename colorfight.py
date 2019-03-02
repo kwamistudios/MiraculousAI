@@ -4,7 +4,7 @@ import os
 import random
 import threading
 
-hostUrl   = 'http://troycolorfight.herokuapp.com/'
+hostUrl   = 'http://colorfight.herokuapp.com/'
 #hostUrl   = 'http://localhost:8000/'
 
 def CheckToken(token):

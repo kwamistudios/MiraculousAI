@@ -85,7 +85,6 @@ class Kwami:
                     pass           
 
     def BuildEiffel( self ):
-        user = self.data[ self.ownerName ][ "user" ]
         if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) > 0:
             if len( self.data[ "enemy" ][ "all" ] ) > 0:
                 targets = self.GetDistances( self.data[ "enemy" ][ "all" ], self.data[ self.ownerName ][ "own" ][ "safe" ] )
@@ -93,7 +92,7 @@ class Kwami:
                 for target in targets:
                     self.game.BuildBase( target[ 0 ].x, target[ 0 ].y )
         else:
-            if user.baseNum == 2:
+            if self.game.baseNum == 2:
                 if len( self.data[ "enemy" ][ "all" ] ) > 0:
                     targets = self.GetDistances( self.data[ "enemy" ][ "all" ], self.data[ self.ownerName ][ "own" ][ "all" ] )
                     targets.sort( key = lambda tup: tup[ 1 ], reverse = True )
@@ -103,13 +102,12 @@ class Kwami:
 
 
     def GameLoop( self ):
-        user = self.data[ self.ownerName ][ "user" ]
-        if user.baseNum < 3 and user.gold >= 60:
+        if self.game.baseNum < 3 and self.game.gold >= 60:
             self.BuildEiffel()
         if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) == 0 and choice( ( 0, 1 ) ) == 0:
-            self.PursueGold()
+            return self.PursueSafe()
         else:
-            self.PursueSafe()
+            self.PursueGold()
 
 class MasterFu:
     def __init__( self ):
@@ -126,6 +124,12 @@ class MasterFu:
         self.mari = Kwami( "Tikki", "Marinette", self.data )
         self.adrien = Kwami( "Plagg", "Adrien", self.data )
         self.alya = Kwami( "Trixx", "Alya", self.data )
+
+        # Initialize Wayzz's communication
+        self.wayzz = {}
+        self.wayzz[ "Marinette" ] = self.mari
+        self.wayzz[ "Adrien" ] = self.adrien
+        self.wayzz[ "Alya" ] = self.alya
 
         # Transform the Miraculous holders
         self.holders = set()
@@ -190,7 +194,15 @@ class MasterFu:
             self.data[ t ][ "normal" ] = []
         for user in self.info.users:
             if user.id in self.holders:
-                self.data[ self.data[ "ids" ][ user.id ] ][ "user" ] = user
+                s = self.wayzz[ self.data[ "ids" ][ user.id ] ].game
+                s.gold   = user.gold
+                s.energy = user.energy
+                s.cdTime = user.cdTime
+                s.buildCdTime = user.buildCdTime
+                s.cellNum = user.cellNum
+                s.baseNum = user.baseNum
+                s.goldCellNum = user.goldCellNum
+                s.energyCellNum = user.energyCellNum
         for x in range( 30 ):
             for y in range( 30 ):
                 c = self.info.GetCell( x, y )
