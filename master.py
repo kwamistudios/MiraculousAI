@@ -32,15 +32,62 @@ class Kwami:
             return data[ 0 ]
         return False
 
+    def AttackTargets( self, targets, distances = False ):
+        for target in targets:
+            if distances:
+                target = target[ 0 ]
+            if self.Attack( target ):
+                return
+
+    def GetDistance( self, c1, c2 ):
+        return ( c1.y - c2.y ) ** 2 + ( c1.x - c2.x ) ** 2
+
+    def GetDistances( self, to ):
+        targets = []
+        distances = []
+        for target in self.data[ self.ownerName ][ "adjacent" ][ "all" ]:
+            distances = []
+            for gold in to:
+                distances.append( self.GetDistance( target, gold ) )
+            distances.sort()
+            targets.append( ( target, distances[ 0 ] ) )
+        return targets
+        
+    def PursueSafe( self ):
+        allies = []
+        for ally in self.data[ self.ownerName ][ "allies" ]:
+            allies += self.data[ ally ][ "own" ][ "all" ]
+        if len( allies ) > 0:
+            targets = self.GetDistances( allies )
+            targets.sort( key = lambda tup: tup[ 1 ] )
+            self.AttackTargets( targets, distances = True )
+
+    def PursueGold( self ):
+        if len( self.data[ "empty" ][ "gold" ] ) > 0:
+            targets = self.GetDistances( self.data[ "empty" ][ "gold" ] )
+            targets.sort( key = lambda tup: tup[ 1 ] )
+            self.AttackTargets( targets, distances = True )
+        if len( self.data[ "enemy" ][ "gold" ] ) > 0:
+            targets = self.GetDistances( self.data[ "enemy" ][ "gold" ] )
+            targets.sort( key = lambda tup: tup[ 1 ] )
+            self.AttackTargets( targets, distances = True )
+
     def Start( self ):
         while self.data[ "playing" ]:
-            self.GameLoop()
+            if self.data[ "debug" ]:
+                self.GameLoop()
+            else:
+                try:
+                    self.GameLoop()
+                except:
+                    pass           
 
     def GameLoop( self ):
-        try:
-            self.Attack( choice( self.data[ self.ownerName ][ "adjacent" ][ "all" ] ) )
-        except:
-            pass
+        if len( self.data)
+        if choice( ( 0, 1 ) ) == 0:
+            self.PursueGold()
+        else:
+            self.PursueSafe()
 
 class MasterFu:
     def __init__( self ):
@@ -50,6 +97,7 @@ class MasterFu:
         # Initialize the hive mind
         self.data = {}
         self.data[ "playing" ] = True
+        self.data[ "debug" ] = True
         self.data[ "ids" ] = {}
 
         # Initialize the Miraculous holders
@@ -89,24 +137,44 @@ class MasterFu:
         ownerName = self.data[ "ids" ][ cell.owner ]
         self.data[ ownerName ][ "own" ][ "all" ].append( cell )
         for adj in self.GetAdjacent( cell ):
-            if adj and not self.OwnCell( adj ):
-                self.data[ ownerName ][ "adjacent" ][ "all" ].append( adj )
+            if adj:
+                if not self.OwnCell( adj ):
+                    self.data[ ownerName ][ "adjacent" ][ "all" ].append( adj )
+                elif not adj.owner == cell.owner:
+                    self.data[ self.data[ "ids" ][ adj.owner ] ][ "own" ][ "safe" ].append( adj )
 
     def Refresh( self ):
         self.info.Refresh()
         self.data[ "Marinette" ] = {}
+        self.data[ "Marinette" ][ "allies" ] = [ "Adrien", "Alya" ]
         self.data[ "Adrien" ] = {}
+        self.data[ "Adrien" ][ "allies" ] = [ "Marinette", "Alya" ]
         self.data[ "Alya" ] = {}
+        self.data[ "Alya" ][ "allies" ] = [ "Adrien", "Marinette" ]
         for ownerName in ( "Marinette", "Adrien", "Alya" ):
             for t in ( "own", "adjacent" ):
                 self.data[ ownerName ][ t ] = {}
                 for s in ( "all", "bases" ):
                     self.data[ ownerName ][ t ][ s ] = []
+                self.data[ ownerName ][ "own" ][ "safe" ] = []
+        for t in ( "empty", "enemy" ):
+            self.data[ t ] = {}
+            self.data[ t ][ "all" ] = []
+            self.data[ t ][ "gold" ] = []
+            self.data[ t ][ "energy" ] = []
+            self.data[ t ][ "normal" ] = []
         for x in range( 30 ):
             for y in range( 30 ):
                 c = self.info.GetCell( x, y )
                 if self.OwnCell( c ):
                     self.EvaluateCell( c )
+                else:
+                    if c.owner == 0:
+                        self.data[ "empty" ][ "all" ].append( c )
+                        self.data[ "empty" ][ c.cellType ].append( c )
+                    else:
+                        self.data[ "enemy" ][ "all" ].append( c )
+                        self.data[ "enemy" ][ c.cellType ].append( c )
 
     def GameLoop( self ):
         while self.data[ "playing" ]:
