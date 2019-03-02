@@ -42,10 +42,12 @@ class Kwami:
     def GetDistance( self, c1, c2 ):
         return ( c1.y - c2.y ) ** 2 + ( c1.x - c2.x ) ** 2
 
-    def GetDistances( self, to ):
+    def GetDistances( self, to, fr = None ):
         targets = []
         distances = []
-        for target in self.data[ self.ownerName ][ "adjacent" ][ "all" ]:
+        if fr == None:
+            fr = self.data[ self.ownerName ][ "adjacent" ][ "all" ]
+        for target in fr:
             distances = []
             for gold in to:
                 distances.append( self.GetDistance( target, gold ) )
@@ -82,9 +84,29 @@ class Kwami:
                 except:
                     pass           
 
+    def BuildEiffel( self ):
+        user = self.data[ self.ownerName ][ "user" ]
+        if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) > 0:
+            if len( self.data[ "enemy" ][ "all" ] ) > 0:
+                targets = self.GetDistances( self.data[ "enemy" ][ "all" ], self.data[ self.ownerName ][ "own" ][ "safe" ] )
+                targets.sort( key = lambda tup: tup[ 1 ], reverse = True )
+                for target in targets:
+                    self.game.BuildBase( target[ 0 ].x, target[ 0 ].y )
+        else:
+            if user.baseNum == 2:
+                if len( self.data[ "enemy" ][ "all" ] ) > 0:
+                    targets = self.GetDistances( self.data[ "enemy" ][ "all" ], self.data[ self.ownerName ][ "own" ][ "all" ] )
+                    targets.sort( key = lambda tup: tup[ 1 ], reverse = True )
+                    for target in targets:
+                        self.game.BuildBase( target[ 0 ].x, target[ 0 ].y )
+                
+
+
     def GameLoop( self ):
-        if len( self.data)
-        if choice( ( 0, 1 ) ) == 0:
+        user = self.data[ self.ownerName ][ "user" ]
+        if user.baseNum < 3 and user.gold >= 60:
+            self.BuildEiffel()
+        if len( self.data[ self.ownerName ][ "own" ][ "safe" ] ) == 0 and choice( ( 0, 1 ) ) == 0:
             self.PursueGold()
         else:
             self.PursueSafe()
@@ -142,6 +164,8 @@ class MasterFu:
                     self.data[ ownerName ][ "adjacent" ][ "all" ].append( adj )
                 elif not adj.owner == cell.owner:
                     self.data[ self.data[ "ids" ][ adj.owner ] ][ "own" ][ "safe" ].append( adj )
+                    if adj.isBase:
+                        self.data[ self.data[ "ids" ][ adj.owner ] ][ "own" ][ "safebases" ].append( adj )
 
     def Refresh( self ):
         self.info.Refresh()
@@ -156,13 +180,17 @@ class MasterFu:
                 self.data[ ownerName ][ t ] = {}
                 for s in ( "all", "bases" ):
                     self.data[ ownerName ][ t ][ s ] = []
-                self.data[ ownerName ][ "own" ][ "safe" ] = []
+            self.data[ ownerName ][ "own" ][ "safe" ] = []
+            self.data[ ownerName ][ "own" ][ "safebases" ] = []
         for t in ( "empty", "enemy" ):
             self.data[ t ] = {}
             self.data[ t ][ "all" ] = []
             self.data[ t ][ "gold" ] = []
             self.data[ t ][ "energy" ] = []
             self.data[ t ][ "normal" ] = []
+        for user in self.info.users:
+            if user.id in self.holders:
+                self.data[ self.data[ "ids" ][ user.id ] ][ "user" ] = user
         for x in range( 30 ):
             for y in range( 30 ):
                 c = self.info.GetCell( x, y )
